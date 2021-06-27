@@ -1,0 +1,2 @@
+1. Convert to nested object
+2. Implement fuzzy matching to return drive name and path
