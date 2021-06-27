@@ -18,12 +18,16 @@ class Cataloger(metaclass=SingletonMeta):
         self._set_drives_root()
         self._detect_drives()
         self._warn_unsupported_drives_count()
-        self._set_selected_drive_path()
-        self._read_current_catalog()
-        self._manifest_overwriting_protection_check(self.current_catalog)
-        self._set_cataloging_time()
-        self._catalog_files()
-        self.update_existing_catalog()
+        self._catalog_discovered_drives()
+
+    def _catalog_discovered_drives(self):
+        for drivepath in self.drivepaths:
+            self._set_selected_drive_path(drivepath)
+            self._get_current_catalog()
+            self._manifest_overwriting_protection_check(self.current_catalog)
+            self._set_cataloging_time()
+            self._catalog_files()
+            self.update_existing_catalog()
 
     def _set_drives_root(self) -> None:
         self.os_drive_root = Path("/Volumes")
@@ -35,11 +39,18 @@ class Cataloger(metaclass=SingletonMeta):
             for drivepath in self.os_drive_root.glob("*")
             if drivepath.stem not in self.hd_list
         ]
+        print("Drive(s) detected:")
+        [print(drive_path) for drive_path in self.drivepaths]
 
     def _warn_unsupported_drives_count(self):
-        if len(self.drivepaths) != 1:
-            logger.error("More than 1 external drives detected!")
-            sys.exit()
+        if len(self.drivepaths) > 1:
+            logger.warning("More than 1 external drives detected!\n")
+            continue_ = input(
+                "Would you like to catalog all detected drives? (y, yes): "
+            )
+            if continue_.lower() not in ["y", "yes"]:
+                print("Exiting...")
+                sys.exit()
 
     def _set_cataloging_time(self):
         self.cataloging_time = str(datetime.now())
@@ -57,26 +68,39 @@ class Cataloger(metaclass=SingletonMeta):
                 f"Received valid input! Overwriting manifest for {self.drivepath.stem}"
             )
 
-    def _set_selected_drive_path(self):
-        self.drivepath = self.os_drive_root / self.drivepaths[0]
+    def _set_selected_drive_path(self, drivepath):
+        self.drivepath = self.os_drive_root / drivepath
 
-    def _read_current_catalog(self):
+    def _get_current_catalog(self):
         print(f"{self.drivepath} detected, cataloging it!")
         try:
-            self.output_file = from_root("") / "catalog.json"
-            try:
-                with open(self.output_file, "r", encoding="UTF-8") as fp:
-                    self.current_catalog = json.load(fp)
-            except JSONDecodeError:
-                self.current_catalog = dict()
-
-            if not isinstance(self.current_catalog, dict):
-                ic("No current catalog found, creating new empty catalog")
-                self.current_catalog = dict()
-
+            self._resolve_catalog_file_location()
+            self._read_catalog_from_file()
+            self._verify_read_from_catalog()
         except FileNotFoundError:
-            ic("No current catalog found, creating new empty catalog")
+            self._handle_no_existing_catalog()
+
+    def _handle_no_existing_catalog(self):
+        logger.warning("No current catalog found, creating new empty catalog")
+        self._create_new_catalog()
+
+    def _verify_read_from_catalog(self):
+        if not isinstance(self.current_catalog, dict):
+            logger.warning("No current catalog found, creating new empty catalog")
+            self._create_new_catalog()
+
+    def _read_catalog_from_file(self):
+        try:
+            with open(self.output_file, "r", encoding="UTF-8") as fp:
+                self.current_catalog = json.load(fp)
+        except JSONDecodeError:
             self.current_catalog = dict()
+
+    def _resolve_catalog_file_location(self):
+        self.output_file = from_root("") / "catalog.json"
+
+    def _create_new_catalog(self):
+        self.current_catalog = dict()
 
     def _catalog_files(self):
         print(f"Cataloging files on {self.drivepath.stem} as of {self.cataloging_time}")
@@ -87,11 +111,9 @@ class Cataloger(metaclass=SingletonMeta):
                 if Path(path).is_file
             ]
         )
-
         if not filepaths:
             logger.error("Failed to find files on drive, is it plugged in?")
             sys.exit()
-
         ic(filepaths)
         self.filepaths = filepaths
 
@@ -101,15 +123,12 @@ class Cataloger(metaclass=SingletonMeta):
                 self.output_file,
                 self.output_file.parent / f"{self.output_file.stem}_backup.json",
             )
-
         with open(self.output_file, "w", encoding="utf8") as fp:
             self.current_catalog[self.drivepath.stem] = {
                 "catalogued_date": self.cataloging_time,
                 "paths": self.filepaths,
             }
-
             json.dump(self.current_catalog, fp)
-
         print(f"Finished cataloging {self.drivepath}")
 
 
