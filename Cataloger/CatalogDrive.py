@@ -12,6 +12,13 @@ from SingletonMeta import SingletonMeta
 
 logger = logging.getLogger(__name__)
 
+OS_HD_LIST = [
+    "Macintosh HD",
+    "C",
+]
+
+OS_MOUNT_POINT = Path("/Volumes")
+
 # RX: TODO: Refactor into smaller, single responsibility classes
 class Cataloger(metaclass=SingletonMeta):
     def __init__(self):
@@ -30,27 +37,38 @@ class Cataloger(metaclass=SingletonMeta):
             self.update_existing_catalog()
 
     def _set_drives_root(self) -> None:
-        self.os_drive_root = Path("/Volumes")
+        self.os_drives_mounting_point = OS_MOUNT_POINT
 
     def _detect_drives(self) -> None:
-        self.hd_list = ["Macintosh HD"]
+        self.hd_list = OS_HD_LIST
         self.drivepaths = [
             drivepath.stem
-            for drivepath in self.os_drive_root.glob("*")
+            for drivepath in self.os_drives_mounting_point.glob("*")
             if drivepath.stem not in self.hd_list
         ]
-        print("Drive(s) detected:")
-        [print(drive_path) for drive_path in self.drivepaths]
+        self._print_detected_drives()
+
+    def _print_detected_drives(self):
+        if len(self.drivepaths) > 0:
+            print("Drive(s) detected:")
+            [print(drive_path) for drive_path in self.drivepaths]
 
     def _warn_unsupported_drives_count(self):
-        if len(self.drivepaths) > 1:
-            logger.warning("More than 1 external drives detected!\n")
+        detected_drive_count = len(self.drivepaths)
+        if detected_drive_count == 0:
+            print("Did not detect any external drives.")
+            print("Exiting...")
+            sys.exit()
+
+        if detected_drive_count > 0:
+            logger.warning("{detected_drive_count} external drives detected!\n")
             continue_ = input(
                 "Would you like to catalog all detected drives? (y, yes): "
             )
             if continue_.lower() not in ["y", "yes"]:
                 print("Exiting...")
                 sys.exit()
+            return
 
     def _set_cataloging_time(self):
         self.cataloging_time = str(datetime.now())
@@ -69,7 +87,7 @@ class Cataloger(metaclass=SingletonMeta):
             )
 
     def _set_selected_drive_path(self, drivepath):
-        self.drivepath = self.os_drive_root / drivepath
+        self.drivepath = self.os_drives_mounting_point / drivepath
 
     def _get_current_catalog(self):
         print(f"{self.drivepath} detected, cataloging it!")

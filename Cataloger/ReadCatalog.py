@@ -3,10 +3,14 @@ import json
 from icecream import ic
 from SingletonMeta import SingletonMeta
 
+
+CATALOG_FILE_LOCATION = from_root("catalog.json")
+
+
 # TODO: RX: break into smaller single responsibility classes
 class CatalogReader(metaclass=SingletonMeta):
     def __init__(self):
-        self._catalog_file = from_root("catalog.json")
+        self._configure_catalog_file_location()
         self._read_catalog_file()
         self._enumerate_drives()
         self._count_catalogued_files()
@@ -14,6 +18,9 @@ class CatalogReader(metaclass=SingletonMeta):
         self._print_options()
         self._get_selected_drive_descriptor()
         self._print_selected_drive_descriptor()
+
+    def _configure_catalog_file_location(self):
+        self._catalog_file = CATALOG_FILE_LOCATION
 
     def _print_selected_drive_descriptor(self):
         try:
