@@ -12,6 +12,8 @@ class CatalogReader(metaclass=SingletonMeta):
     def __init__(self):
         self._configure_catalog_file_location()
         self._read_catalog_file()
+
+    def utility(self):
         self._enumerate_drives()
         self._count_catalogued_files()
         self._print_stats()
@@ -20,7 +22,7 @@ class CatalogReader(metaclass=SingletonMeta):
         self._print_selected_drive_descriptor()
 
     def _configure_catalog_file_location(self):
-        self._catalog_file = CATALOG_FILE_LOCATION
+        self.catalog_file = CATALOG_FILE_LOCATION
 
     def _print_selected_drive_descriptor(self):
         try:
@@ -56,9 +58,9 @@ class CatalogReader(metaclass=SingletonMeta):
         )
 
     def _read_catalog_file(self):
-        with open(self._catalog_file, "r") as fp:
+        with open(self.catalog_file, "r") as fp:
             self.drive_descriptors = json.load(fp)
 
 
 if __name__ == ("__main__"):
-    CatalogReader()
+    CatalogReader().utility()
