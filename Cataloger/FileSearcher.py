@@ -2,6 +2,11 @@ from icecream import ic
 from SingletonMeta import SingletonMeta
 from ReadCatalog import CatalogReader
 from fuzzywuzzy import process
+import sys
+
+
+def take_cli_input():
+    return " ".join(sys.argv[1:])
 
 
 class FileSearcher(metaclass=SingletonMeta):
@@ -73,7 +78,7 @@ class FileSearcher(metaclass=SingletonMeta):
 
 
 if __name__ == "__main__":
+    search_string = take_cli_input() or input("What would you like to search for?: ")
+    print(f"Searching for {search_string}\n")
     FileSearcher().count_paths()
-
-    search_string = input("What would you like to search for?: ")
     FileSearcher().search(search_string)
