@@ -3,6 +3,10 @@ from SingletonMeta import SingletonMeta
 from ReadCatalog import CatalogReader
 from fuzzywuzzy import process
 import sys
+import os
+
+sys.path.append(os.getcwd())
+from Cataloger.DriveDisplay import IMAGE_STORE, display_drive_image
 
 
 def take_cli_input():
@@ -56,10 +60,19 @@ class FileSearcher(metaclass=SingletonMeta):
         return sum(scores)
 
     def _guess_most_likely_drive(self, drive_scores):
-        sorted_drive_scores = sorted(drive_scores, key=lambda x: x[1], reverse=True)
+        self.sorted_drive_scores = sorted(
+            drive_scores, key=lambda x: x[1], reverse=True
+        )
 
         print("Most likely drives:")
-        [print(f"{drive}: {score}") for drive, score in sorted_drive_scores]
+        [print(f"{drive}: {score}") for drive, score in self.sorted_drive_scores]
+
+    def _show_top_n_drive_images(self, n=3):
+        display_selection = self.sorted_drive_scores[:n]
+        for index, drive_name in enumerate(display_selection):
+            rank = index + 1
+            image_path_of_drive = Path(IMAGE_STORE) / f"{drive_name}.HEIC"
+            display_drive_image(image_path_of_drive, rank)
 
     def _get_drive_last_catalogued_date(self, descriptor):
         catalogued_date = descriptor["catalogued_date"]
@@ -82,3 +95,4 @@ if __name__ == "__main__":
     print(f"Searching for {search_string}\n")
     FileSearcher().count_paths()
     FileSearcher().search(search_string)
+    FileSearcher()._show_top_n_drive_images()

@@ -7,7 +7,6 @@ Catalog multiple external drives. Fuzzy search a file to find the right drive!
 3. python3 -m venv venv
 4. source venv/bin/activate (Always call this when using the utilities)
 5. pip3 install -r requirements.txt
-6. cd Cataloger
 
 ## Utilities (Currently supporting mac, other OS coming soon):
 1. USB Drive Cataloguer: python3 -m Cataloger/CatalogDrive.py
