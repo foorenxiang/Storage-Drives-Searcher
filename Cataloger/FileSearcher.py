@@ -1,9 +1,13 @@
 from icecream import ic
+import sys
+import os
+
+sys.path.append(os.getcwd())
 from SingletonMeta import SingletonMeta
 from ReadCatalog import CatalogReader
 from fuzzywuzzy import process
-import sys
-import os
+
+from pathlib import Path
 
 sys.path.append(os.getcwd())
 from Cataloger.DriveDisplay import IMAGE_STORE, display_drive_image
@@ -72,7 +76,10 @@ class FileSearcher(metaclass=SingletonMeta):
         for index, drive_name in enumerate(display_selection):
             rank = index + 1
             image_path_of_drive = Path(IMAGE_STORE) / f"{drive_name}.HEIC"
-            display_drive_image(image_path_of_drive, rank)
+            if image_path_of_drive.exists():
+                display_drive_image(image_path_of_drive, rank)
+                continue
+            print(f"Could not find image for {drive_name}")
 
     def _get_drive_last_catalogued_date(self, descriptor):
         catalogued_date = descriptor["catalogued_date"]
@@ -83,7 +90,8 @@ class FileSearcher(metaclass=SingletonMeta):
         return paths
 
     def _print_matches(self, matches_and_scores):
-        ic(matches_and_scores)
+        # ic(matches_and_scores)
+        [print(match, score) for match, score in matches_and_scores]
 
     def _print_drive_info(self, drive, catalogued_date):
         print(f"{drive}")
