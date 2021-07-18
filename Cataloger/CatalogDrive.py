@@ -5,10 +5,14 @@ import json
 from icecream import ic
 from from_root import from_root
 from datetime import datetime
+import os
 import sys
 import glob
 import shutil
-from SingletonMeta import SingletonMeta
+
+sys.path.append(os.getcwd())
+
+from Cataloger.utils.SingletonMeta import SingletonMeta
 
 logger = logging.getLogger(__name__)
 

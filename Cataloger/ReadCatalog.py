@@ -1,7 +1,12 @@
 from from_root import from_root
 import json
 from icecream import ic
-from SingletonMeta import SingletonMeta
+import sys
+import os
+
+sys.path.append(os.getcwd())
+
+from Cataloger.utils.SingletonMeta import SingletonMeta
 
 
 CATALOG_FILE_LOCATION = from_root("catalog.json")
