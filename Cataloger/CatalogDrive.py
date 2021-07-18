@@ -61,7 +61,7 @@ class Cataloger(metaclass=SingletonMeta):
             sys.exit()
 
         if detected_drive_count > 0:
-            logger.warning("{detected_drive_count} external drives detected!\n")
+            logger.warning(f"{detected_drive_count} external drives detected!\n")
             continue_ = input(
                 "Would you like to catalog all detected drives? (y, yes): "
             )
