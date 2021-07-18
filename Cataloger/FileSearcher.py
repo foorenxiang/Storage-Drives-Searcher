@@ -15,7 +15,9 @@ from Cataloger.DriveDisplay import IMAGE_STORE, display_drive_image
 
 
 def take_cli_input():
-    return " ".join(sys.argv[1:])
+    cli_input = " ".join(sys.argv[1:])
+    if cli_input:
+        print("CLI inputs has been deprecated. Please enter search term here instead:")
 
 
 class FileSearcher(metaclass=SingletonMeta):
@@ -30,9 +32,13 @@ class FileSearcher(metaclass=SingletonMeta):
 
     def count_paths(self):
         for drive, descriptor in self.drive_descriptors.items():
+            catalogued_date = FileSearcher().get_drive_last_catalogued_date(descriptor)
+            # print(f"Searching {drive} last catalogued on {catalogued_date}")
             paths = descriptor["paths"]
-            print(f"{drive}: ", len(paths), "paths")
-        print("\n")
+            print(
+                f"{drive} last catalogued on {catalogued_date} with {len(paths)} paths"
+            )
+        print()
 
     def match_to_search_term(self, search_term, strings_to_search):
         matches_and_scores = fwprocess.extractBests(
@@ -55,13 +61,18 @@ class FileSearcher(metaclass=SingletonMeta):
             drive_scores, key=lambda x: x[1], reverse=True
         )
         self.print_title("Most likely drives:")
-        [print(f"{drive}: {score}") for drive, score in self.sorted_drive_scores]
+        [
+            print(f"{drive}: {score}")
+            for drive, score in self.sorted_drive_scores
+            if score > 10
+        ]
 
     def _show_top_n_drive_images(self, n=3):
-        display_selection = self.sorted_drive_scores[:n]
-        for index, drive_name in enumerate(display_selection):
+        display_selection = self.sorted_drive_scores[:n][::-1]
+        for index, (drive_name, _) in enumerate(display_selection):
             rank = index + 1
             image_path_of_drive = Path(IMAGE_STORE) / f"{drive_name}.HEIC"
+            print(image_path_of_drive)
             if image_path_of_drive.exists():
                 display_drive_image(image_path_of_drive, rank)
                 continue
@@ -76,11 +87,9 @@ class FileSearcher(metaclass=SingletonMeta):
         return paths
 
     def print_matches_in_drive(self, drive, matches_and_scores):
-        self.print_title(f"{drive.upper()}")
         if matches_and_scores:
+            self.print_title(f"{drive.upper()}")
             [print(match, score) for match, score in matches_and_scores]
-            return
-        print("No matches found")
 
     def search_all_drives(self, search_term):
         queue = Queue()
@@ -100,12 +109,10 @@ class FileSearcher(metaclass=SingletonMeta):
             FileSearcher().print_matches_in_drive(drive, matches_and_scores)
             drive_scores.append((drive, drive_score))
         FileSearcher().guess_most_likely_drive(drive_scores)
-        print("Search finished!")
+        self.print_title("Search finished!")
 
     @staticmethod
     def search_individual_drive(search_term, drive, descriptor, queue):
-        catalogued_date = FileSearcher().get_drive_last_catalogued_date(descriptor)
-        print(f"Searching {drive} last catalogued on {catalogued_date}")
         paths = FileSearcher().get_paths_from_drive_descriptor(descriptor)
         matches_and_scores = FileSearcher().match_to_search_term(search_term, paths)
         matches, scores = [], []
@@ -118,13 +125,14 @@ class FileSearcher(metaclass=SingletonMeta):
 
 
 @time_exec
-def run_search(take_cli_input, FileSearcher):
-    search_term = take_cli_input() or input("What would you like to search for?: ")
-    print(f"Searching for {search_term}\n")
+def run_search():
+    take_cli_input()
+    search_term = input("What would you like to search for?: ")
+    FileSearcher().print_title(f"Searching for {search_term}\n")
     FileSearcher().count_paths()
     FileSearcher().search_all_drives(search_term)
     FileSearcher()._show_top_n_drive_images()
 
 
 if __name__ == "__main__":
-    run_search(take_cli_input, FileSearcher)
+    run_search()
