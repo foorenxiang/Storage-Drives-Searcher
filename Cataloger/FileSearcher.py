@@ -1,11 +1,11 @@
-from icecream import ic
 import sys
 import os
 from fuzzywuzzy import process as fwprocess
 from multiprocessing import Process, Queue
 
 sys.path.append(os.getcwd())
-from SingletonMeta import SingletonMeta
+from Cataloger.utils.SingletonMeta import SingletonMeta
+from Cataloger.utils.TimeExecution import time_exec
 from ReadCatalog import CatalogReader
 
 from pathlib import Path
@@ -117,9 +117,14 @@ class FileSearcher(metaclass=SingletonMeta):
         queue.put((drive, drive_score, matches_and_scores))
 
 
-if __name__ == "__main__":
+@time_exec
+def run_search(take_cli_input, FileSearcher):
     search_term = take_cli_input() or input("What would you like to search for?: ")
     print(f"Searching for {search_term}\n")
     FileSearcher().count_paths()
     FileSearcher().search_all_drives(search_term)
     FileSearcher()._show_top_n_drive_images()
+
+
+if __name__ == "__main__":
+    run_search(take_cli_input, FileSearcher)
