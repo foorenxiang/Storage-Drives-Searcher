@@ -1,11 +1,12 @@
 from icecream import ic
 import sys
 import os
+from fuzzywuzzy import process as fwprocess
+from multiprocessing import Process, Queue
 
 sys.path.append(os.getcwd())
 from SingletonMeta import SingletonMeta
 from ReadCatalog import CatalogReader
-from fuzzywuzzy import process
 
 from pathlib import Path
 
@@ -21,39 +22,25 @@ class FileSearcher(metaclass=SingletonMeta):
     def __init__(self) -> None:
         self.drive_descriptors: dict = CatalogReader().drive_descriptors
 
+    def print_title(self, title):
+        SEPARATOR_CHAR = "#"
+        separator = "".join([SEPARATOR_CHAR for _ in title])
+        separator_template = f"\n{separator}\n" f"{title}" f"\n{separator}\n"
+        print(separator_template)
+
     def count_paths(self):
         for drive, descriptor in self.drive_descriptors.items():
             paths = descriptor["paths"]
             print(f"{drive}: ", len(paths), "paths")
+        print("\n")
 
-    def _match_to_search_term(self, search_term, strings_to_search):
-        matches_and_scores = process.extractBests(
+    def match_to_search_term(self, search_term, strings_to_search):
+        matches_and_scores = fwprocess.extractBests(
             search_term, strings_to_search, score_cutoff=80, limit=50
         )
         return matches_and_scores
 
-    def search(self, search_term):
-        print("\n")
-        drive_scores = []
-        for drive, descriptor in self.drive_descriptors.items():
-            catalogued_date = self._get_drive_last_catalogued_date(descriptor)
-            paths = self._get_paths_from_drive_descriptor(descriptor)
-            self._print_drive_info(drive, catalogued_date)
-            matches_and_scores = self._match_to_search_term(search_term, paths)
-            matches, scores = [], []
-            [
-                (matches.append(match_), scores.append(score))
-                for match_, score in matches_and_scores
-            ]
-
-            self._print_matches(matches_and_scores)
-            drive_score = self._score_drive(scores)
-            drive_scores.append((drive, drive_score))
-
-        self._guess_most_likely_drive(drive_scores)
-        print("Search finished!")
-
-    def _score_drive(self, scores):
+    def score_drive(self, scores):
         # matches_cutoff = 2
         # if len(scores) >= matches_cutoff:
         #     top_2_scores_in_drive_match = scores[:matches_cutoff]
@@ -63,12 +50,11 @@ class FileSearcher(metaclass=SingletonMeta):
         # return 0
         return sum(scores)
 
-    def _guess_most_likely_drive(self, drive_scores):
+    def guess_most_likely_drive(self, drive_scores):
         self.sorted_drive_scores = sorted(
             drive_scores, key=lambda x: x[1], reverse=True
         )
-
-        print("Most likely drives:")
+        self.print_title("Most likely drives:")
         [print(f"{drive}: {score}") for drive, score in self.sorted_drive_scores]
 
     def _show_top_n_drive_images(self, n=3):
@@ -81,26 +67,59 @@ class FileSearcher(metaclass=SingletonMeta):
                 continue
             print(f"Could not find image for {drive_name}")
 
-    def _get_drive_last_catalogued_date(self, descriptor):
+    def get_drive_last_catalogued_date(self, descriptor):
         catalogued_date = descriptor["catalogued_date"]
         return catalogued_date
 
-    def _get_paths_from_drive_descriptor(self, descriptor):
+    def get_paths_from_drive_descriptor(self, descriptor):
         paths = descriptor["paths"]
         return paths
 
-    def _print_matches(self, matches_and_scores):
-        # ic(matches_and_scores)
-        [print(match, score) for match, score in matches_and_scores]
+    def print_matches_in_drive(self, drive, matches_and_scores):
+        self.print_title(f"{drive.upper()}")
+        if matches_and_scores:
+            [print(match, score) for match, score in matches_and_scores]
+            return
+        print("No matches found")
 
-    def _print_drive_info(self, drive, catalogued_date):
-        print(f"{drive}")
-        print("Drive last catalogued at:", catalogued_date)
+    def search_all_drives(self, search_term):
+        queue = Queue()
+        processes = [
+            Process(
+                target=FileSearcher().search_individual_drive,
+                args=(search_term, drive, descriptor, queue),
+            )
+            for drive, descriptor in self.drive_descriptors.items()
+        ]
+        [process.start() for process in processes]
+        [process.join() for process in processes]
+        process_results = [queue.get() for _ in processes]
+        drive_scores = list()
+        for result in process_results:
+            drive, drive_score, matches_and_scores = result
+            FileSearcher().print_matches_in_drive(drive, matches_and_scores)
+            drive_scores.append((drive, drive_score))
+        FileSearcher().guess_most_likely_drive(drive_scores)
+        print("Search finished!")
+
+    @staticmethod
+    def search_individual_drive(search_term, drive, descriptor, queue):
+        catalogued_date = FileSearcher().get_drive_last_catalogued_date(descriptor)
+        print(f"Searching {drive} last catalogued on {catalogued_date}")
+        paths = FileSearcher().get_paths_from_drive_descriptor(descriptor)
+        matches_and_scores = FileSearcher().match_to_search_term(search_term, paths)
+        matches, scores = [], []
+        [
+            (matches.append(match_), scores.append(score))
+            for match_, score in matches_and_scores
+        ]
+        drive_score = FileSearcher().score_drive(scores)
+        queue.put((drive, drive_score, matches_and_scores))
 
 
 if __name__ == "__main__":
-    search_string = take_cli_input() or input("What would you like to search for?: ")
-    print(f"Searching for {search_string}\n")
+    search_term = take_cli_input() or input("What would you like to search for?: ")
+    print(f"Searching for {search_term}\n")
     FileSearcher().count_paths()
-    FileSearcher().search(search_string)
+    FileSearcher().search_all_drives(search_term)
     FileSearcher()._show_top_n_drive_images()
