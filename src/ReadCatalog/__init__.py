@@ -6,7 +6,8 @@ import os
 
 sys.path.append(os.getcwd())
 from src.utils.SingletonMeta import SingletonMeta
-
+from src.Cataloger.Initializer import Initializer
+from src.FileSearcher import FileSearcher
 
 CATALOG_FILE_LOCATION = from_root("catalog.json")
 
@@ -14,8 +15,9 @@ CATALOG_FILE_LOCATION = from_root("catalog.json")
 # TODO: RX: break into smaller single responsibility classes
 class CatalogReader(metaclass=SingletonMeta):
     def __init__(self):
-        self._configure_catalog_file_location()
-        self._read_catalog_file()
+        self.catalogs_path = Initializer(catalog_drives=False).catalogs_path
+        self.drive_descriptors = dict()
+        self._read_catalog_files()
 
     def utility(self):
         self._enumerate_drives()
@@ -24,9 +26,6 @@ class CatalogReader(metaclass=SingletonMeta):
         self._print_options()
         self._get_selected_drive_descriptor()
         self._print_selected_drive_descriptor()
-
-    def _configure_catalog_file_location(self):
-        self.catalog_file = CATALOG_FILE_LOCATION
 
     def _print_selected_drive_descriptor(self):
         try:
@@ -52,7 +51,9 @@ class CatalogReader(metaclass=SingletonMeta):
     def _count_catalogued_files(self):
         self.items_catalogued = 0
         for descriptor in self.drive_descriptors.values():
-            self.items_catalogued += len(descriptor["paths"])
+            self.items_catalogued = len(
+                FileSearcher().get_paths_from_drive_descriptor(descriptor)
+            )
 
     def _enumerate_drives(self):
         self.drives_catalogued = self.drive_descriptors.keys()
@@ -61,9 +62,11 @@ class CatalogReader(metaclass=SingletonMeta):
             enumerate(self.drives_catalogued, self.enumeration_offset)
         )
 
-    def _read_catalog_file(self):
-        with open(self.catalog_file, "r") as fp:
-            self.drive_descriptors = json.load(fp)
+    def _read_catalog_files(self):
+        for catalog_path in self.catalogs_path.glob("*.json"):
+            drivename = catalog_path.stem
+            with open(catalog_path, "r") as fp:
+                self.drive_descriptors[drivename] = json.load(fp)
 
 
 if __name__ == ("__main__"):
