@@ -16,29 +16,16 @@ from Cataloger.utils.SingletonMeta import SingletonMeta
 
 logger = logging.getLogger(__name__)
 
-OS_HD_LIST = [
-    "Macintosh HD",
-    "C",
-]
+OS_HD_LIST = ["Macintosh HD", "C", "com.apple.TimeMachine"]
 
 OS_MOUNT_POINT = Path("/Volumes")
 
-# RX: TODO: Refactor into smaller, single responsibility classes
-class Cataloger(metaclass=SingletonMeta):
+
+class Initializer(metaclass=SingletonMeta):
     def __init__(self):
         self._set_drives_root()
         self._detect_drives()
         self._warn_unsupported_drives_count()
-        self._catalog_discovered_drives()
-
-    def _catalog_discovered_drives(self):
-        for drivepath in self.drivepaths:
-            self._set_selected_drive_path(drivepath)
-            self._get_current_catalog()
-            self._manifest_overwriting_protection_check(self.current_catalog)
-            self._set_cataloging_time()
-            self._catalog_files()
-            self.update_existing_catalog()
 
     def _set_drives_root(self) -> None:
         self.os_drives_mounting_point = OS_MOUNT_POINT
@@ -51,11 +38,6 @@ class Cataloger(metaclass=SingletonMeta):
             if drivepath.stem not in self.hd_list
         ]
         self._print_detected_drives()
-
-    def _print_detected_drives(self):
-        if len(self.drivepaths) > 0:
-            print("Drive(s) detected:")
-            [print(drive_path) for drive_path in self.drivepaths]
 
     def _warn_unsupported_drives_count(self):
         detected_drive_count = len(self.drivepaths)
@@ -73,6 +55,30 @@ class Cataloger(metaclass=SingletonMeta):
                 print("Exiting...")
                 sys.exit()
             return
+
+    def _print_detected_drives(self):
+        if len(self.drivepaths) > 0:
+            print("Drive(s) detected:")
+            [print(drive_path) for drive_path in self.drivepaths]
+
+
+# RX: TODO: Refactor into smaller, single responsibility classes
+class CatalogerUtility(metaclass=SingletonMeta):
+    def __init__(self):
+        Initializer()
+        self.os_drives_mounting_point = Initializer().os_drives_mounting_point
+        self.hd_list = Initializer().hd_list
+        self.drivepaths = Initializer().drivepaths
+        self._catalog_discovered_drives()
+
+    def _catalog_discovered_drives(self):
+        for drivepath in self.drivepaths:
+            self._set_selected_drive_path(drivepath)
+            self._get_current_catalog()
+            self._manifest_overwriting_protection_check(self.current_catalog)
+            self._set_cataloging_time()
+            self.catalog_files()
+            self.update_existing_catalog()
 
     def _set_cataloging_time(self):
         self.cataloging_time = str(datetime.now())
@@ -124,14 +130,12 @@ class Cataloger(metaclass=SingletonMeta):
     def _create_new_catalog(self):
         self.current_catalog = dict()
 
-    def _catalog_files(self):
+    def catalog_files(self):
         print(f"Cataloging files on {self.drivepath.stem} as of {self.cataloging_time}")
-        filepaths = list()
-        paths_and_stats = list()
+        paths_and_stats = tuple()
         for path in glob.glob(f"{self.drivepath}/**/*", recursive=True):
             if Path(path).is_file:
                 path_string = str(Path(path).relative_to(self.drivepath))
-                filepaths.append(path_string)
                 path = Path(self.drivepath) / path_string
                 file_stat = {
                     "path": path_string,
@@ -139,16 +143,10 @@ class Cataloger(metaclass=SingletonMeta):
                     "path_modified_time": path.stat().st_mtime,
                     "path_accessed_time": path.stat().st_atime,
                 }
-                paths_and_stats.append(file_stat)
-
-        filepaths = tuple(filepaths)
-        paths_and_stats = tuple(paths_and_stats)
-
-        if not filepaths:
+                paths_and_stats += (file_stat,)
+        if not paths_and_stats:
             logger.error("Failed to find files on drive, is it plugged in?")
             sys.exit()
-        ic(filepaths)
-        self.filepaths = filepaths
         self.paths_and_stats = paths_and_stats
 
     def update_existing_catalog(self):
@@ -160,7 +158,6 @@ class Cataloger(metaclass=SingletonMeta):
         with open(self.output_file, "w", encoding="utf8") as fp:
             self.current_catalog[self.drivepath.stem] = {
                 "catalogued_date": self.cataloging_time,
-                "paths": self.filepaths,
                 "paths_and_stats": self.paths_and_stats,
             }
             json.dump(self.current_catalog, fp)
@@ -168,4 +165,4 @@ class Cataloger(metaclass=SingletonMeta):
 
 
 if __name__ == "__main__":
-    Cataloger()
+    CatalogerUtility()
