@@ -8,6 +8,7 @@ from src.utils.SingletonMeta import SingletonMeta
 from src.Cataloger.Initializer import Initializer
 from src.Cataloger.CatalogHandler import CatalogHandler
 
+
 logger = logging.getLogger(__name__)
 
 

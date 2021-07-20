@@ -13,6 +13,7 @@ sys.path.append(os.getcwd())
 from src.utils.SingletonMeta import SingletonMeta
 from src.Cataloger.Initializer import Initializer
 from src.Cataloger.Cataloger import Cataloger
+from src.utils.TimeExecution import time_exec
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ class CatalogHandler(metaclass=SingletonMeta):
             )
         print(f"Finished cataloging {self.drivepath}")
 
+    @time_exec
     def catalog_discovered_drives(self):
         for drivename in Initializer().drivenames:
             self.drivepath = Initializer().os_drives_mounting_point / drivename
