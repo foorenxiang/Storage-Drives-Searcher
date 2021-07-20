@@ -12,7 +12,7 @@ import shutil
 
 sys.path.append(os.getcwd())
 
-from Cataloger.utils.SingletonMeta import SingletonMeta
+from src.utils.SingletonMeta import SingletonMeta
 
 logger = logging.getLogger(__name__)
 

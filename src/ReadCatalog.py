@@ -5,8 +5,7 @@ import sys
 import os
 
 sys.path.append(os.getcwd())
-
-from Cataloger.utils.SingletonMeta import SingletonMeta
+from src.utils.SingletonMeta import SingletonMeta
 
 
 CATALOG_FILE_LOCATION = from_root("catalog.json")

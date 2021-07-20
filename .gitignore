@@ -158,6 +158,6 @@ thumb
 sketch
 
 catalog.json
-
 catalog*.json
+drive_catalogs
 # End of https://www.toptal.com/developers/gitignore/api/python,react

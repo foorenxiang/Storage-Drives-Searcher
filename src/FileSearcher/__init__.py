@@ -2,16 +2,13 @@ import sys
 import os
 from fuzzywuzzy import process as fwprocess
 from multiprocessing import Process, Queue
-
-sys.path.append(os.getcwd())
-from Cataloger.utils.SingletonMeta import SingletonMeta
-from Cataloger.utils.TimeExecution import time_exec
-from ReadCatalog import CatalogReader
-
 from pathlib import Path
 
 sys.path.append(os.getcwd())
-from Cataloger.DriveDisplay import IMAGE_STORE, display_drive_image
+from src.Cataloger.CatalogHandler import CatalogHandler
+from src.utils.SingletonMeta import SingletonMeta
+from src.utils.TimeExecution import time_exec
+from src.DriveDisplay import IMAGE_STORE, display_drive_image
 
 
 def take_cli_input():
@@ -22,7 +19,7 @@ def take_cli_input():
 
 class FileSearcher(metaclass=SingletonMeta):
     def __init__(self) -> None:
-        self.drive_descriptors: dict = CatalogReader().drive_descriptors
+        self.drive_descriptors = CatalogHandler().read_catalogs()
 
     def print_title(self, title):
         SEPARATOR_CHAR = "#"
@@ -33,8 +30,7 @@ class FileSearcher(metaclass=SingletonMeta):
     def count_paths(self):
         for drive, descriptor in self.drive_descriptors.items():
             catalogued_date = FileSearcher().get_drive_last_catalogued_date(descriptor)
-            # print(f"Searching {drive} last catalogued on {catalogued_date}")
-            paths = descriptor["paths"]
+            paths = FileSearcher().get_paths_from_drive_descriptor(descriptor)
             print(
                 f"{drive} last catalogued on {catalogued_date} with {len(paths)} paths"
             )
@@ -83,7 +79,8 @@ class FileSearcher(metaclass=SingletonMeta):
         return catalogued_date
 
     def get_paths_from_drive_descriptor(self, descriptor):
-        paths = descriptor["paths"]
+        paths_and_stats = descriptor["paths_and_stats"]
+        paths = [path_and_stat["path"] for path_and_stat in paths_and_stats]
         return paths
 
     def print_matches_in_drive(self, drive, matches_and_scores):

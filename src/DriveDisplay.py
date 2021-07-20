@@ -3,8 +3,9 @@ import whatimage
 import pyheif
 from PIL import Image
 from pathlib import Path
+from from_root import from_root
 
-IMAGE_STORE = "./Cataloger/drive_images"
+IMAGE_STORE = from_root(".") / "drive_images"
 
 
 def display_drive_image(filepath, index=None):
