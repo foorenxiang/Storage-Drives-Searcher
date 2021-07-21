@@ -49,12 +49,12 @@ class CatalogHandler(metaclass=SingletonMeta):
             self.current_catalog[self.catalog_file.stem] = dict()
 
     def update_existing_catalog(self):
-        if self.catalog_file.exists():
-            shutil.copy(
-                self.catalog_file,
-                self.catalog_file.parent
-                / f"Z_CATALOGER_BACKUP{self.catalog_file.stem}.json",
-            )
+        # if self.catalog_file.exists():
+        #     shutil.copy(
+        #         self.catalog_file,
+        #         self.catalog_file.parent
+        #         / f"Z_CATALOGER_BACKUP{self.catalog_file.stem}.json",
+        #     )
         with open(self.catalog_file, "w", encoding="utf8") as fp:
             json.dump(
                 {
