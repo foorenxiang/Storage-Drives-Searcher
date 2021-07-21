@@ -8,7 +8,7 @@ def time_exec(func: callable):
         start_time = time()
         execution_result = func(*args, **kwargs)
         execution_time = time() - start_time
-        print(f"Execution time for {func.__name__}:", execution_time)
+        print(f"Execution time for {func.__name__}: {execution_time:.3f}s")
         return execution_result
 
     return wrapper
