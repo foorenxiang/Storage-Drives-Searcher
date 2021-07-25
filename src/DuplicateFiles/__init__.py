@@ -66,19 +66,19 @@ class DuplicateFiles(metaclass=SingletonMeta):
         drive_a_paths_descriptors = self.catalog[drive_a]["paths_and_stats"]
         if drive_a == drive_b:
             print(f"\nWorking on {drive_a}")
-            self.compare_paths_in_same_drive(drive_a, drive_a_paths_descriptors)
+            self.find_duplicate_paths_in_same_drive(drive_a, drive_a_paths_descriptors)
             return
 
         drive_b_paths_descriptors = self.catalog[drive_b]["paths_and_stats"]
         print(f"\nWorking on {drive_a} and {drive_b}")
-        self.compare_paths_across_two_different_drives(
+        self.find_duplicate_paths_across_two_different_drives(
             drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
         )
 
     def print_paths_compared(self):
         print(f"{self.paths_compared} paths compared")
 
-    def compare_paths_across_two_different_drives(
+    def find_duplicate_paths_across_two_different_drives(
         self, drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
     ):
         def is_duplicate():
@@ -110,7 +110,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
         self.print_paths_compared()
         self.duplicate_items += duplicate_items
 
-    def compare_paths_in_same_drive(self, drive_a, drive_a_paths_descriptors):
+    def find_duplicate_paths_in_same_drive(self, drive_a, drive_a_paths_descriptors):
         def is_duplicate():
             return (
                 dict_a["path_size"] == dict_b["path_size"]
@@ -148,7 +148,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
         self.print_paths_compared()
         self.duplicate_items += duplicate_items
 
-    def compare_all_drives(self):
+    def find_duplicates_in_all_drives(self):
         if SKIP_SEARCH:
             print("Skipping search".upper())
             with open("duplicate_items.json", "rb") as fp:
@@ -187,7 +187,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
 
         self.duplicate_items = tuple(filter(remove_duplicates, self.duplicate_items))
 
-    def verification(self):
+    def verify_identified_duplicates(self):
         error_items = self.find_potential_errors()
         print(f"\n{len(error_items)} wrong paths detected!")
         if not error_items:
@@ -226,13 +226,13 @@ class DuplicateFiles(metaclass=SingletonMeta):
                 [fp.write(f"{item}\n") for item in file_definitions[drive]]
 
     @time_exec
-    def compare_all_paths(self):
-        self.compare_all_drives()
-        self.verification()
+    def process_duplicates(self):
+        self.find_duplicates_in_all_drives()
+        self.verify_identified_duplicates()
         self.determine_space_savings()
         self.generate_report_output()
         self.generate_paths_to_delete()
 
 
 if __name__ == "__main__":
-    DuplicateFiles().compare_all_paths()
+    DuplicateFiles().process_duplicates()
