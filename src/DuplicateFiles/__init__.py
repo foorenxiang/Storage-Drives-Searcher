@@ -47,6 +47,12 @@ class DuplicateFiles(metaclass=SingletonMeta):
                 descriptor["path"] = Path(descriptor["path"])
                 descriptor["pathname"] = descriptor["path"].name
 
+    def is_not_excluded_file(self, path_a, path_b):
+        for item in self.exclude:
+            if item in str(path_a) or item in str(path_b):
+                return False
+        return True
+
     def is_duplicate(
         self,
         drive_a: str,
@@ -66,15 +72,8 @@ class DuplicateFiles(metaclass=SingletonMeta):
         return (
             dict_a["path_size"] == dict_b["path_size"]
             and dict_a["pathname"] == dict_b["pathname"]
-            and not (
-                any(
-                    [
-                        item
-                        for item in self.exclude
-                        if item in str(Path(drive_a) / path_a)
-                        or item in str(Path(drive_b) / path_b)
-                    ]
-                )
+            and self.is_not_excluded_file(
+                (Path(drive_a) / path_a), (Path(drive_b) / path_b)
             )
         )
 
