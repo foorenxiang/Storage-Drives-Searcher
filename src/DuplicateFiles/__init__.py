@@ -11,7 +11,8 @@ from src.utils.SingletonMeta import SingletonMeta
 from src.ReadCatalog import CatalogReader
 from src.utils.TimeExecution import time_exec
 
-SKIP_SEARCH = True
+SKIP_SEARCH = False
+PRINT_PATHS = True
 
 
 class DuplicateFiles(metaclass=SingletonMeta):
@@ -45,7 +46,15 @@ class DuplicateFiles(metaclass=SingletonMeta):
                 descriptor["path"] = Path(descriptor["path"])
                 descriptor["pathname"] = descriptor["path"].name
 
-    def is_duplicate(self, drive_a, drive_b, dict_a, path_a, dict_b, path_b):
+    def is_duplicate(
+        self,
+        drive_a: str,
+        drive_b: str,
+        dict_a: dict,
+        path_a: str,
+        dict_b: dict,
+        path_b: str,
+    ):
         if (
             (drive_a == drive_b)
             and dict_a["path_size"] == dict_b["path_size"]
@@ -83,6 +92,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
         print(f"\nWorking on {drive_a} and {drive_b}")
         drive_a_paths_descriptors = self.catalog[drive_a]["paths_and_stats"]
         drive_b_paths_descriptors = self.catalog[drive_b]["paths_and_stats"]
+        duplicate_items = list()
         for dict_a in drive_a_paths_descriptors:
             print(f"\r{self.paths_compared} paths compared", end="", flush=True)
             self.paths_compared += 1
@@ -93,24 +103,30 @@ class DuplicateFiles(metaclass=SingletonMeta):
                 if self.is_duplicate(drive_a, drive_b, dict_a, path_a, dict_b, path_b):
                     bytes_to_gb = lambda bytes_: bytes_ / 1024 / 1024 / 1024
 
-                    self.duplicate_items.append(
+                    entry = (
                         (
                             f"{drive_a}/{path_a}",
                             f"{drive_b}/{path_b}",
                             f"{bytes_to_gb(dict_a['path_size'])}",
                         )
-                    ) if dict_a["path_modified_time"] >= dict_b[
-                        "path_modified_time"
-                    ] else self.duplicate_items.append(
-                        (
+                        if dict_a["path_modified_time"] >= dict_b["path_modified_time"]
+                        else (
                             f"{drive_b}/{path_b}",
                             f"{drive_a}/{path_a}",
                             f"{bytes_to_gb(dict_a['path_size'])}",
                         )
                     )
+                    if drive_a == drive_b and entry in duplicate_items:
+                        self.duplicate_items.extend(duplicate_items)
+                        return
 
-                    print(f"\n\n{drive_a}/{path_a}")
-                    print(f"{drive_b}/{path_b}\n\n")
+                    duplicate_items.append(
+                        entry
+                    ) if entry not in duplicate_items else None
+
+                    if PRINT_PATHS:
+                        print(f"\n\n{drive_a}/{path_a}")
+                        print(f"{drive_b}/{path_b}\n\n")
 
     def compare_all_drives(self):
         if SKIP_SEARCH:
@@ -134,33 +150,28 @@ class DuplicateFiles(metaclass=SingletonMeta):
         for item in self.duplicate_items:
             original_list.append((item[0], item[1]))
             flip_list.append((item[1], item[0]))
-
         for item in tuple(original_list):
             if item in tuple(flip_list):
                 error_items.append(item)
+        return error_items
 
-        self.error_items = error_items
-        print(f"{len(self.error_items)} wrong paths detected!")
-
-    def correct_potential_errors(self):
-        print(f"Attempting to correct {len(self.error_items)} errors")
+    def correct_potential_errors(self, error_items: list):
+        print(f"Attempting to correct {len(error_items)} errors")
 
         def remove_duplicates(item):
-            for error_item in tuple(self.error_items):
+            for error_item in tuple(error_items):
                 if error_item[0] == item[0] and error_item[1] == item[1]:
-                    self.error_items.remove(error_item)
+                    error_items.remove(error_item)
                     return False
             return True
 
         self.duplicate_items = tuple(filter(remove_duplicates, self.duplicate_items))
 
-    def final_printout(self):
+    def determine_space_savings(self):
         for item in self.duplicate_items:
             self.space_savings += float(item[2])
         space_savings_in_gb = self.space_savings
         print(f"\nSpace savings possible: {space_savings_in_gb:.1f}GB")
-        print(f"{len(self.error_items)} wrong paths detected!")
-        print(f"Utility finished with {self.paths_compared} paths compared")
 
     def generate_report_output(self):
         df = pd.DataFrame(
@@ -171,16 +182,37 @@ class DuplicateFiles(metaclass=SingletonMeta):
 
     @time_exec
     def sanity_check(self):
-        self.find_potential_errors()
-        self.correct_potential_errors()
-        self.find_potential_errors()
+        error_items = self.find_potential_errors()
+        print("Error items:")
+        [
+            print((f"\n" f"{item[0]}\n" f"{item[1]}\n" f"\n"))
+            for item in sorted(error_items, key=lambda x: x[0])
+        ]
+        get_drive_from_path = lambda path: path.split("/")[0]
+        print("Error items matches:")
+        for error_item in error_items:
+            print("\n\nError item:")
+            print(error_item)
+            for item in self.duplicate_items:
+                if (item[0] == error_item[0] and item[1] == error_item[1]) or (
+                    item[0] == error_item[1] and item[1] == error_item[0]
+                ):
+                    # print((item[0], item[1]))
+                    # print((get_drive_from_path(item[0]), get_drive_from_path(item[1])))
+                    # print((item[0].split("/")[0], item[1]).split("/")[0])
+                    assert get_drive_from_path(item[0]) == get_drive_from_path(item[1])
+
+        print(f"\n{len(error_items)} wrong paths detected!")
+        self.correct_potential_errors(error_items)
+        error_items = self.find_potential_errors()
+        print(f"{len(error_items)} wrong paths detected!")
 
     @time_exec
     def compare_all_paths(self):
         self.compare_all_drives()
         self.generate_report_output()
         self.sanity_check()
-        self.final_printout()
+        self.determine_space_savings()
 
 
 if __name__ == "__main__":
