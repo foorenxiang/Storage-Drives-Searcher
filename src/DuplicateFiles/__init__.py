@@ -12,19 +12,15 @@ from src.ReadCatalog import CatalogReader
 from src.utils.TimeExecution import time_exec
 
 SKIP_SEARCH = False
-PRINT_PATHS = True
+PRINT_PATHS = False
+EXCLUDED_PATHS = []
 
 
 class DuplicateFiles(metaclass=SingletonMeta):
     def __init__(self) -> None:
         self.catalog = deepcopy(CatalogReader().drive_descriptors)
         self.drives = tuple(self.catalog.keys())
-        self.exclude = [
-            r"$RECYCLE.BIN",
-            r"System Volume Information",
-            r"DoNotUse/Music Performances",
-            r"Samsung T5/repeated shows",
-        ]
+        self.exclude = EXCLUDED_PATHS
         self.min_size_in_bytes = 100 * 1024 * 1024
         self.duplicate_items = list()
         if not SKIP_SEARCH:
@@ -88,45 +84,42 @@ class DuplicateFiles(metaclass=SingletonMeta):
         )
         return reduced_descriptor
 
+    def bytes_to_gb(self, bytes_):
+        return bytes_ / 1024 / 1024 / 1024
+
     def compare_paths_across_two_drives(self, drive_a, drive_b):
-        print(f"\nWorking on {drive_a} and {drive_b}")
+        if drive_a != drive_b:
+            print(f"\nWorking on {drive_a} and {drive_b}")
+        else:
+            print(f"\nWorking on {drive_a}")
         drive_a_paths_descriptors = self.catalog[drive_a]["paths_and_stats"]
         drive_b_paths_descriptors = self.catalog[drive_b]["paths_and_stats"]
         duplicate_items = list()
         for dict_a in drive_a_paths_descriptors:
-            print(f"\r{self.paths_compared} paths compared", end="", flush=True)
-            self.paths_compared += 1
             path_a = dict_a["path"]
             for dict_b in drive_b_paths_descriptors:
                 self.paths_compared += 1
                 path_b = dict_b["path"]
                 if self.is_duplicate(drive_a, drive_b, dict_a, path_a, dict_b, path_b):
-                    bytes_to_gb = lambda bytes_: bytes_ / 1024 / 1024 / 1024
-
                     entry = (
-                        (
-                            f"{drive_a}/{path_a}",
-                            f"{drive_b}/{path_b}",
-                            f"{bytes_to_gb(dict_a['path_size'])}",
-                        )
-                        if dict_a["path_modified_time"] >= dict_b["path_modified_time"]
-                        else (
-                            f"{drive_b}/{path_b}",
-                            f"{drive_a}/{path_a}",
-                            f"{bytes_to_gb(dict_a['path_size'])}",
-                        )
+                        f"{drive_a}/{path_a}",
+                        f"{drive_b}/{path_b}",
+                        f"{self.bytes_to_gb(dict_a['path_size'])}",
                     )
-                    if drive_a == drive_b and entry in duplicate_items:
-                        self.duplicate_items.extend(duplicate_items)
-                        return
-
-                    duplicate_items.append(
-                        entry
-                    ) if entry not in duplicate_items else None
-
+                    if drive_a == drive_b:
+                        complement_entry = (
+                            f"{drive_b}/{path_b}",
+                            f"{drive_a}/{path_a}",
+                            f"{self.bytes_to_gb(dict_a['path_size'])}",
+                        )
+                        if complement_entry in duplicate_items:
+                            continue
+                    duplicate_items.append(entry)
                     if PRINT_PATHS:
                         print(f"\n\n{drive_a}/{path_a}")
                         print(f"{drive_b}/{path_b}\n\n")
+        print(f"{self.paths_compared} paths compared")
+        self.duplicate_items.extend(duplicate_items)
 
     def compare_all_drives(self):
         if SKIP_SEARCH:
@@ -167,6 +160,18 @@ class DuplicateFiles(metaclass=SingletonMeta):
 
         self.duplicate_items = tuple(filter(remove_duplicates, self.duplicate_items))
 
+    @time_exec
+    def sanity_check(self):
+        error_items = self.find_potential_errors()
+        print(f"\n{len(error_items)} wrong paths detected!")
+        if not error_items:
+            return
+        self.correct_potential_errors(error_items)
+        error_items = self.find_potential_errors()
+        print(f"{len(error_items)} wrong paths detected!")
+        if error_items:
+            raise RuntimeError("Exiting due to duplicate search failure")
+
     def determine_space_savings(self):
         for item in self.duplicate_items:
             self.space_savings += float(item[2])
@@ -181,38 +186,11 @@ class DuplicateFiles(metaclass=SingletonMeta):
         df.to_html(from_root(".") / "duplicates.html")
 
     @time_exec
-    def sanity_check(self):
-        error_items = self.find_potential_errors()
-        print("Error items:")
-        [
-            print((f"\n" f"{item[0]}\n" f"{item[1]}\n" f"\n"))
-            for item in sorted(error_items, key=lambda x: x[0])
-        ]
-        get_drive_from_path = lambda path: path.split("/")[0]
-        print("Error items matches:")
-        for error_item in error_items:
-            print("\n\nError item:")
-            print(error_item)
-            for item in self.duplicate_items:
-                if (item[0] == error_item[0] and item[1] == error_item[1]) or (
-                    item[0] == error_item[1] and item[1] == error_item[0]
-                ):
-                    # print((item[0], item[1]))
-                    # print((get_drive_from_path(item[0]), get_drive_from_path(item[1])))
-                    # print((item[0].split("/")[0], item[1]).split("/")[0])
-                    assert get_drive_from_path(item[0]) == get_drive_from_path(item[1])
-
-        print(f"\n{len(error_items)} wrong paths detected!")
-        self.correct_potential_errors(error_items)
-        error_items = self.find_potential_errors()
-        print(f"{len(error_items)} wrong paths detected!")
-
-    @time_exec
     def compare_all_paths(self):
         self.compare_all_drives()
-        self.generate_report_output()
         self.sanity_check()
         self.determine_space_savings()
+        self.generate_report_output()
 
 
 if __name__ == "__main__":
