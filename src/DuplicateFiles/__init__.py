@@ -11,6 +11,8 @@ from src.utils.SingletonMeta import SingletonMeta
 from src.ReadCatalog import CatalogReader
 from src.utils.TimeExecution import time_exec
 
+
+MIN_SIZE_IN_MB = 100
 SKIP_SEARCH = False
 PRINT_PATHS = False
 EXCLUDED_PATHS = [
@@ -26,26 +28,29 @@ class DuplicateFiles(metaclass=SingletonMeta):
         self.catalog = deepcopy(CatalogReader().drive_descriptors)
         self.drives = tuple(self.catalog.keys())
         self.exclude = EXCLUDED_PATHS
-        self.min_size_in_bytes = 100 * 1024 * 1024
-        self.duplicate_items = list()
+        self.min_size_in_bytes = MIN_SIZE_IN_MB * 1024 * 1024
+        self.duplicate_items = tuple()
         if not SKIP_SEARCH:
-            self.reduce_catalog_based_on_min_filesize()
-            self.cast_paths_to_path_object()
+            self.optimise_descriptors()
         self.paths_compared = 0
         self.space_savings = 0
-        self.a_list, self.b_list = list(), list()
 
-    def reduce_catalog_based_on_min_filesize(self):
-        for drive in self.catalog.keys():
-            self.catalog[drive]["paths_and_stats"] = self.reduce_descriptors(
-                self.catalog[drive]["paths_and_stats"]
-            )
+    def reduce_descriptor_based_on_min_filesize(self, drive):
+        descriptor = self.catalog[drive]["paths_and_stats"]
+        reduced_descriptor = tuple(
+            [item for item in descriptor if item["path_size"] > self.min_size_in_bytes]
+        )
+        self.catalog[drive]["paths_and_stats"] = reduced_descriptor
 
-    def cast_paths_to_path_object(self):
+    def cast_paths_to_path_object(self, drive):
+        for descriptor in self.catalog[drive]["paths_and_stats"]:
+            descriptor["path"] = Path(descriptor["path"])
+            descriptor["pathname"] = descriptor["path"].name
+
+    def optimise_descriptors(self):
         for drive in self.catalog.keys():
-            for descriptor in self.catalog[drive]["paths_and_stats"]:
-                descriptor["path"] = Path(descriptor["path"])
-                descriptor["pathname"] = descriptor["path"].name
+            self.reduce_descriptor_based_on_min_filesize(drive)
+            self.cast_paths_to_path_object(drive)
 
     def is_not_excluded_file(self, path_a, path_b):
         for item in self.exclude:
@@ -77,27 +82,21 @@ class DuplicateFiles(metaclass=SingletonMeta):
             )
         )
 
-    @time_exec
-    def reduce_descriptors(self, descriptor):
-        reduced_descriptor = tuple(
-            [item for item in descriptor if item["path_size"] > self.min_size_in_bytes]
-        )
-        return reduced_descriptor
-
     def bytes_to_gb(self, bytes_):
         return bytes_ / 1024 / 1024 / 1024
 
     def compare_paths_across_two_drives(self, drive_a, drive_b):
         drive_a_paths_descriptors = self.catalog[drive_a]["paths_and_stats"]
-        if drive_a != drive_b:
-            drive_b_paths_descriptors = self.catalog[drive_b]["paths_and_stats"]
-            print(f"\nWorking on {drive_a} and {drive_b}")
-            self.compare_paths_across_two_different_drives(
-                drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
-            )
-        else:
+        if drive_a == drive_b:
             print(f"\nWorking on {drive_a}")
             self.compare_paths_in_same_drive(drive_a, drive_a_paths_descriptors)
+            return
+
+        drive_b_paths_descriptors = self.catalog[drive_b]["paths_and_stats"]
+        print(f"\nWorking on {drive_a} and {drive_b}")
+        self.compare_paths_across_two_different_drives(
+            drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
+        )
 
     def print_paths_compared(self):
         print(f"{self.paths_compared} paths compared")
@@ -105,7 +104,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
     def compare_paths_across_two_different_drives(
         self, drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
     ):
-        duplicate_items = list()
+        duplicate_items = tuple()
         for dict_a in drive_a_paths_descriptors:
             path_a = dict_a["path"]
             for dict_b in drive_b_paths_descriptors:
@@ -117,15 +116,15 @@ class DuplicateFiles(metaclass=SingletonMeta):
                         f"{drive_b}/{path_b}",
                         f"{self.bytes_to_gb(dict_a['path_size'])}",
                     )
-                    duplicate_items.append(entry)
+                    duplicate_items += (entry,)
                     if PRINT_PATHS:
                         print(f"\n\n{drive_a}/{path_a}")
                         print(f"{drive_b}/{path_b}\n\n")
         self.print_paths_compared()
-        self.duplicate_items.extend(duplicate_items)
+        self.duplicate_items += duplicate_items
 
     def compare_paths_in_same_drive(self, drive_a, drive_a_paths_descriptors):
-        duplicate_items = list()
+        duplicate_items = tuple()
         for dict_a in drive_a_paths_descriptors:
             path_a = dict_a["path"]
             for dict_b in drive_a_paths_descriptors:
@@ -144,12 +143,12 @@ class DuplicateFiles(metaclass=SingletonMeta):
                     )
                     if complement_entry in duplicate_items:
                         continue
-                    duplicate_items.append(entry)
+                    duplicate_items += (entry,)
                     if PRINT_PATHS:
                         print(f"\n\n{drive_a}/{path_a}")
                         print(f"{drive_a}/{path_b}\n\n")
         self.print_paths_compared()
-        self.duplicate_items.extend(duplicate_items)
+        self.duplicate_items += duplicate_items
 
     def compare_all_drives(self):
         if SKIP_SEARCH:
