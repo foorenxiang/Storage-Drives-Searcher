@@ -160,4 +160,8 @@ sketch
 catalog.json
 catalog*.json
 drive_catalogs
+sandbox.py
+duplicate_items.json
+duplicates.csv
+duplicates.html
 # End of https://www.toptal.com/developers/gitignore/api/python,react
