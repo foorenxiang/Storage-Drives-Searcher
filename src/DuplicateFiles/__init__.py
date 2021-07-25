@@ -2,24 +2,24 @@ import sys
 import os
 from pathlib import Path
 from from_root import from_root
+from numpy import shares_memory
 import pandas as pd
 from copy import deepcopy
 import pickle
+from collections import defaultdict
 
 sys.path.append(os.getcwd())
 from src.utils.SingletonMeta import SingletonMeta
 from src.ReadCatalog import CatalogReader
 from src.utils.TimeExecution import time_exec
 
-
+PATH_TO_DUMP_DUPLICATES = "Duplicate Items"
 MIN_SIZE_IN_MB = 100
 SKIP_SEARCH = False
 PRINT_PATHS = False
 EXCLUDED_PATHS = [
     r"$RECYCLE.BIN",
     r"System Volume Information",
-    r"DoNotUse/Music Performances",
-    r"Samsung T5/repeated shows",
 ]
 
 
@@ -34,6 +34,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
             self.optimise_descriptors()
         self.paths_compared = 0
         self.space_savings = 0
+        from_root(PATH_TO_DUMP_DUPLICATES).mkdir(exist_ok=True)
 
     def reduce_descriptor_based_on_min_filesize(self, drive):
         descriptor = self.catalog[drive]["paths_and_stats"]
@@ -186,8 +187,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
 
         self.duplicate_items = tuple(filter(remove_duplicates, self.duplicate_items))
 
-    @time_exec
-    def sanity_check(self):
+    def verification(self):
         error_items = self.find_potential_errors()
         print(f"\n{len(error_items)} wrong paths detected!")
         if not error_items:
@@ -208,15 +208,30 @@ class DuplicateFiles(metaclass=SingletonMeta):
         df = pd.DataFrame(
             self.duplicate_items, columns=("File A", "File B", "size in GB")
         )
-        df.to_csv(from_root(".") / "duplicates.csv")
-        df.to_html(from_root(".") / "duplicates.html")
+        df.to_csv(str(from_root(PATH_TO_DUMP_DUPLICATES) / "duplicates.csv"))
+        df.to_html(str(from_root(PATH_TO_DUMP_DUPLICATES) / "duplicates.html"))
+
+    def generate_paths_to_delete(self):
+        paths_to_delete = tuple(sorted([item[1] for item in self.duplicate_items]))
+        file_definitions = defaultdict(list)
+        [
+            file_definitions[str(tuple(Path(pathstring).parents)[-2])].append(
+                pathstring
+            )
+            for pathstring in paths_to_delete
+        ]
+
+        for drive in file_definitions.keys():
+            with open(from_root(PATH_TO_DUMP_DUPLICATES) / f"{drive}.txt", "w") as fp:
+                [fp.write(f"{item}\n") for item in file_definitions[drive]]
 
     @time_exec
     def compare_all_paths(self):
         self.compare_all_drives()
-        self.sanity_check()
+        self.verification()
         self.determine_space_savings()
         self.generate_report_output()
+        self.generate_paths_to_delete()
 
 
 if __name__ == "__main__":
