@@ -13,7 +13,12 @@ from src.utils.TimeExecution import time_exec
 
 SKIP_SEARCH = False
 PRINT_PATHS = False
-EXCLUDED_PATHS = []
+EXCLUDED_PATHS = [
+    r"$RECYCLE.BIN",
+    r"System Volume Information",
+    r"DoNotUse/Music Performances",
+    r"Samsung T5/repeated shows",
+]
 
 
 class DuplicateFiles(metaclass=SingletonMeta):
@@ -67,11 +72,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
                         item
                         for item in self.exclude
                         if item in str(Path(drive_a) / path_a)
-                    ]
-                    + [
-                        item
-                        for item in self.exclude
-                        if item in str(Path(drive_b) / path_b)
+                        or item in str(Path(drive_b) / path_b)
                     ]
                 )
             )
