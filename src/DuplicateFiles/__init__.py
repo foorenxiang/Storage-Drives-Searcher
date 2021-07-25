@@ -58,30 +58,6 @@ class DuplicateFiles(metaclass=SingletonMeta):
                 return False
         return True
 
-    def is_duplicate(
-        self,
-        drive_a: str,
-        drive_b: str,
-        dict_a: dict,
-        path_a: str,
-        dict_b: dict,
-        path_b: str,
-    ):
-        if (
-            (drive_a == drive_b)
-            and dict_a["path_size"] == dict_b["path_size"]
-            and (path_a == path_b)
-        ):
-            return False
-
-        return (
-            dict_a["path_size"] == dict_b["path_size"]
-            and dict_a["pathname"] == dict_b["pathname"]
-            and self.is_not_excluded_file(
-                (Path(drive_a) / path_a), (Path(drive_b) / path_b)
-            )
-        )
-
     def bytes_to_gb(self, bytes_):
         return bytes_ / 1024 / 1024 / 1024
 
@@ -104,13 +80,23 @@ class DuplicateFiles(metaclass=SingletonMeta):
     def compare_paths_across_two_different_drives(
         self, drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
     ):
+        def is_duplicate():
+            return (
+                dict_a["path_size"] == dict_b["path_size"]
+                and dict_a["pathname"] == dict_b["pathname"]
+                and self.is_not_excluded_file(
+                    (Path(drive_a) / path_a), (Path(drive_b) / path_b)
+                )
+            )
+
         duplicate_items = tuple()
+
         for dict_a in drive_a_paths_descriptors:
             path_a = dict_a["path"]
             for dict_b in drive_b_paths_descriptors:
                 self.paths_compared += 1
                 path_b = dict_b["path"]
-                if self.is_duplicate(drive_a, drive_b, dict_a, path_a, dict_b, path_b):
+                if is_duplicate():
                     entry = (
                         f"{drive_a}/{path_a}",
                         f"{drive_b}/{path_b}",
@@ -124,13 +110,24 @@ class DuplicateFiles(metaclass=SingletonMeta):
         self.duplicate_items += duplicate_items
 
     def compare_paths_in_same_drive(self, drive_a, drive_a_paths_descriptors):
+        def is_duplicate():
+            return (
+                dict_a["path_size"] == dict_b["path_size"]
+                and dict_a["pathname"] == dict_b["pathname"]
+                and path_a != path_b
+                and self.is_not_excluded_file(
+                    (Path(drive_a) / path_a), (Path(drive_a) / path_b)
+                )
+            )
+
         duplicate_items = tuple()
+
         for dict_a in drive_a_paths_descriptors:
             path_a = dict_a["path"]
             for dict_b in drive_a_paths_descriptors:
                 self.paths_compared += 1
                 path_b = dict_b["path"]
-                if self.is_duplicate(drive_a, drive_a, dict_a, path_a, dict_b, path_b):
+                if is_duplicate():
                     entry = (
                         f"{drive_a}/{path_a}",
                         f"{drive_a}/{path_b}",
