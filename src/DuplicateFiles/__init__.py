@@ -88,12 +88,23 @@ class DuplicateFiles(metaclass=SingletonMeta):
         return bytes_ / 1024 / 1024 / 1024
 
     def compare_paths_across_two_drives(self, drive_a, drive_b):
+        drive_a_paths_descriptors = self.catalog[drive_a]["paths_and_stats"]
         if drive_a != drive_b:
+            drive_b_paths_descriptors = self.catalog[drive_b]["paths_and_stats"]
             print(f"\nWorking on {drive_a} and {drive_b}")
+            self.compare_paths_across_two_different_drives(
+                drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
+            )
         else:
             print(f"\nWorking on {drive_a}")
-        drive_a_paths_descriptors = self.catalog[drive_a]["paths_and_stats"]
-        drive_b_paths_descriptors = self.catalog[drive_b]["paths_and_stats"]
+            self.compare_paths_in_same_drive(drive_a, drive_a_paths_descriptors)
+
+    def print_paths_compared(self):
+        print(f"{self.paths_compared} paths compared")
+
+    def compare_paths_across_two_different_drives(
+        self, drive_a, drive_b, drive_a_paths_descriptors, drive_b_paths_descriptors
+    ):
         duplicate_items = list()
         for dict_a in drive_a_paths_descriptors:
             path_a = dict_a["path"]
@@ -106,19 +117,38 @@ class DuplicateFiles(metaclass=SingletonMeta):
                         f"{drive_b}/{path_b}",
                         f"{self.bytes_to_gb(dict_a['path_size'])}",
                     )
-                    if drive_a == drive_b:
-                        complement_entry = (
-                            f"{drive_b}/{path_b}",
-                            f"{drive_a}/{path_a}",
-                            f"{self.bytes_to_gb(dict_a['path_size'])}",
-                        )
-                        if complement_entry in duplicate_items:
-                            continue
                     duplicate_items.append(entry)
                     if PRINT_PATHS:
                         print(f"\n\n{drive_a}/{path_a}")
                         print(f"{drive_b}/{path_b}\n\n")
-        print(f"{self.paths_compared} paths compared")
+        self.print_paths_compared()
+        self.duplicate_items.extend(duplicate_items)
+
+    def compare_paths_in_same_drive(self, drive_a, drive_a_paths_descriptors):
+        duplicate_items = list()
+        for dict_a in drive_a_paths_descriptors:
+            path_a = dict_a["path"]
+            for dict_b in drive_a_paths_descriptors:
+                self.paths_compared += 1
+                path_b = dict_b["path"]
+                if self.is_duplicate(drive_a, drive_a, dict_a, path_a, dict_b, path_b):
+                    entry = (
+                        f"{drive_a}/{path_a}",
+                        f"{drive_a}/{path_b}",
+                        f"{self.bytes_to_gb(dict_a['path_size'])}",
+                    )
+                    complement_entry = (
+                        f"{drive_a}/{path_b}",
+                        f"{drive_a}/{path_a}",
+                        f"{self.bytes_to_gb(dict_a['path_size'])}",
+                    )
+                    if complement_entry in duplicate_items:
+                        continue
+                    duplicate_items.append(entry)
+                    if PRINT_PATHS:
+                        print(f"\n\n{drive_a}/{path_a}")
+                        print(f"{drive_a}/{path_b}\n\n")
+        self.print_paths_compared()
         self.duplicate_items.extend(duplicate_items)
 
     def compare_all_drives(self):
