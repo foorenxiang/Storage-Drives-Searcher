@@ -161,8 +161,9 @@ catalog.json
 catalog*.json
 drive_catalogs
 sandbox.py
-duplicate_items.json
+duplicate_items.pkl
 duplicates.csv
 duplicates.html
 Duplicate Items
+Dry Run Output
 # End of https://www.toptal.com/developers/gitignore/api/python,react
