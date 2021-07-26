@@ -1,12 +1,13 @@
 import sys
 import os
 from pathlib import Path
+from typing import Iterable
 from from_root import from_root
-from numpy import shares_memory
 import pandas as pd
 from copy import deepcopy
 import pickle
 from collections import defaultdict
+import json
 
 sys.path.append(os.getcwd())
 from src.utils.SingletonMeta import SingletonMeta
@@ -14,15 +15,16 @@ from src.ReadCatalog import CatalogReader
 from src.utils.TimeExecution import time_exec
 
 PATH_TO_DUMP_DUPLICATES = "Duplicate Items"
-MIN_SIZE_IN_MB = 100
-SKIP_SEARCH = False
+MIN_SIZE_IN_MB = 1
+SKIP_SEARCH = True
 PRINT_PATHS = False
+DRY_RUN = True
 EXCLUDED_PATHS = [
     r"$RECYCLE.BIN",
     r"System Volume Information",
 ]
 
-
+# TODO: Upgrade to singleton safe singleton metaclass
 class DuplicateFiles(metaclass=SingletonMeta):
     def __init__(self) -> None:
         self.catalog = deepcopy(CatalogReader().drive_descriptors)
@@ -148,10 +150,11 @@ class DuplicateFiles(metaclass=SingletonMeta):
         self.print_paths_compared()
         self.duplicate_items += duplicate_items
 
+    # TODO: add multiprocessing with cpu limited process count
     def find_duplicates_in_all_drives(self):
         if SKIP_SEARCH:
             print("Skipping search".upper())
-            with open("duplicate_items.json", "rb") as fp:
+            with open("duplicate_items.pkl", "rb") as fp:
                 self.duplicate_items = pickle.load(fp)
             return
         num_drives = len(self.drives)
@@ -160,7 +163,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
                 drive_a = self.drives[source_drive_idx]
                 drive_b = self.drives[best_drive_idx]
                 self.compare_paths_across_two_drives(drive_a, drive_b)
-        with open("duplicate_items.json", "wb") as fp:
+        with open("duplicate_items.pkl", "wb") as fp:
             pickle.dump(self.duplicate_items, fp, protocol=pickle.HIGHEST_PROTOCOL)
 
     def find_potential_errors(self):
@@ -213,26 +216,58 @@ class DuplicateFiles(metaclass=SingletonMeta):
 
     def generate_paths_to_delete(self):
         paths_to_delete = tuple(sorted([item[1] for item in self.duplicate_items]))
-        file_definitions = defaultdict(list)
+        files_to_delete_dict = defaultdict(list)
         [
-            file_definitions[str(tuple(Path(pathstring).parents)[-2])].append(
+            files_to_delete_dict[str(tuple(Path(pathstring).parents)[-2])].append(
                 pathstring
             )
             for pathstring in paths_to_delete
         ]
 
-        for drive in file_definitions.keys():
+        for drive in files_to_delete_dict.keys():
             with open(from_root(PATH_TO_DUMP_DUPLICATES) / f"{drive}.txt", "w") as fp:
-                [fp.write(f"{item}\n") for item in file_definitions[drive]]
+                [fp.write(f"{item}\n") for item in files_to_delete_dict[drive]]
+        self.files_to_delete_dict = files_to_delete_dict
+
+    def dry_run(self):
+        dry_run_delete_catalog = deepcopy(self.catalog)
+        for drive in self.files_to_delete_dict.keys():
+            drive_descriptor = dry_run_delete_catalog.get(drive)
+            if not drive_descriptor:
+                continue
+            path_and_stats = drive_descriptor.get("paths_and_stats")
+            if not path_and_stats:
+                continue
+
+            def keep_non_duplicates(path_and_stat_descriptor):
+                path = path_and_stat_descriptor.get("path")
+                if not path:
+                    return True
+                path_relative_to_drive = "/".join(path.split("/")[1:])
+                files_to_delete_for_drive = self.files_to_delete_dict.get(drive)
+                if not isinstance(files_to_delete_for_drive, Iterable):
+                    return True
+                return not path_relative_to_drive in files_to_delete_for_drive
+
+            dry_run_delete_catalog[drive]["paths_and_stats"] = list(
+                filter(keep_non_duplicates, path_and_stats)
+            )
+        dry_run_output_folder = from_root("Dry Run Output")
+        dry_run_output_folder.mkdir(exist_ok=True)
+        for drive, descriptor in dry_run_delete_catalog.items():
+            with open(dry_run_output_folder / f"{drive}.json", "w") as fp:
+                json.dump(descriptor["paths_and_stats"], fp)
 
     @time_exec
-    def process_duplicates(self):
+    def process_duplicates(self, dry_run=True):
         self.find_duplicates_in_all_drives()
         self.verify_identified_duplicates()
         self.determine_space_savings()
         self.generate_report_output()
         self.generate_paths_to_delete()
+        if dry_run:
+            self.dry_run()
 
 
 if __name__ == "__main__":
-    DuplicateFiles().process_duplicates()
+    DuplicateFiles().process_duplicates(DRY_RUN)
