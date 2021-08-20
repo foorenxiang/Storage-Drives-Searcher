@@ -75,6 +75,9 @@ def write_module_contents(
     detected_functions_declarations: List[str],
     detected_class_declarations: List[str],
 ) -> None:
+    if test_module_path.exists():
+        print(f"{test_module_path} exists, not overwriting")
+        return
     with open(test_module_path, "w") as fp:
 
         def source_path_template(source_path):
@@ -107,7 +110,7 @@ def write_module_contents(
         if not any((detected_functions_declarations, detected_class_declarations)):
             fp.writelines(generic_test_function_template(test_module_path))
         for function_declaration in detected_functions_declarations:
-            function_name = function_declaration.split("(")[0]
+            function_name = function_declaration[: function_declaration.rindex("(") - 1]
             fp.writelines(test_function_template(function_declaration, function_name))
 
         for class_declaration in detected_class_declarations:
@@ -115,18 +118,20 @@ def write_module_contents(
 
 
 def detect_class_declarations(file_contents: List[str]) -> List[str]:
+    filter_term = "class "
+    filter_term_length = len(filter_term)
     return [
-        line.split("class ")[1].split("(")[0].split(":")[0]
+        line.split(filter_term)[1][: line.rindex("(") - filter_term_length]
         if "(" in line
-        else line.split("class ")[1].split(":")[0]
+        else line.split(filter_term)[1][: line.rindex(":") - filter_term_length]
         for line in file_contents
-        if line.startswith("class ")
+        if line.startswith(filter_term)
     ]
 
 
 def detect_function_declarations(file_contents: List[str]) -> List[str]:
     return [
-        line.split("def ")[1].split(":")[0]
+        line.split("def ")[1][: line.rindex(":") - 1]
         for line in file_contents
         if line.startswith("def ")
     ]
