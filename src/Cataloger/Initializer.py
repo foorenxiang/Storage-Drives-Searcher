@@ -15,9 +15,13 @@ _OS_MOUNT_POINT = Path("/Volumes")
 
 class Initializer(metaclass=SingletonMeta):
     def __init__(self, catalog_drives=True):
-        self.catalogs_path = Path("drive_catalogs")
+        self.app_folder = Path.home() / ".Storage Drive Searcher"
+        self.catalogs_path = self.app_folder / "drive_catalogs"
         self.os_drives_mounting_point = _OS_MOUNT_POINT
         self.hd_list = _OS_HD_LIST
+
+        self.app_folder.mkdir(exist_ok=True)
+
         if catalog_drives:
             self._detect_drives()
             self._warn_unsupported_drives_count()

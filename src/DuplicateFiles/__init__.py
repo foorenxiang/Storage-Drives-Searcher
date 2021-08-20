@@ -2,7 +2,6 @@ import sys
 import os
 from pathlib import Path
 from typing import Iterable
-from from_root import from_root
 import pandas as pd
 from copy import deepcopy
 import pickle
@@ -14,7 +13,8 @@ from src.utils.SingletonMeta import SingletonMeta
 from src.ReadCatalog import CatalogReader
 from src.utils.TimeExecution import time_exec
 
-PATH_TO_DUMP_DUPLICATES = "Duplicate Items"
+APP_FOLDER = Path.home() / ".Storage Drive Searcher"
+PATH_TO_DUMP_DUPLICATES = APP_FOLDER / "Duplicate Items"
 MIN_SIZE_IN_MB = 1
 SKIP_SEARCH = True
 PRINT_PATHS = False
@@ -36,7 +36,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
             self.optimise_descriptors()
         self.paths_compared = 0
         self.space_savings = 0
-        from_root(PATH_TO_DUMP_DUPLICATES).mkdir(exist_ok=True)
+        PATH_TO_DUMP_DUPLICATES.mkdir(exist_ok=True)
 
     def reduce_descriptor_based_on_min_filesize(self, drive):
         descriptor = self.catalog[drive]["paths_and_stats"]
@@ -211,8 +211,8 @@ class DuplicateFiles(metaclass=SingletonMeta):
         df = pd.DataFrame(
             self.duplicate_items, columns=("File A", "File B", "size in GB")
         )
-        df.to_csv(str(from_root(PATH_TO_DUMP_DUPLICATES) / "duplicates.csv"))
-        df.to_html(str(from_root(PATH_TO_DUMP_DUPLICATES) / "duplicates.html"))
+        df.to_csv(str(PATH_TO_DUMP_DUPLICATES / "duplicates.csv"))
+        df.to_html(str(PATH_TO_DUMP_DUPLICATES / "duplicates.html"))
 
     def generate_paths_to_delete(self):
         paths_to_delete = tuple(sorted([item[1] for item in self.duplicate_items]))
@@ -225,7 +225,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
         ]
 
         for drive in files_to_delete_dict.keys():
-            with open(from_root(PATH_TO_DUMP_DUPLICATES) / f"{drive}.txt", "w") as fp:
+            with open(PATH_TO_DUMP_DUPLICATES / f"{drive}.txt", "w") as fp:
                 [fp.write(f"{item}\n") for item in files_to_delete_dict[drive]]
         self.files_to_delete_dict = files_to_delete_dict
 
@@ -252,7 +252,7 @@ class DuplicateFiles(metaclass=SingletonMeta):
             dry_run_delete_catalog[drive]["paths_and_stats"] = list(
                 filter(keep_non_duplicates, path_and_stats)
             )
-        dry_run_output_folder = from_root("Dry Run Output")
+        dry_run_output_folder = APP_FOLDER / "Dry Run Output"
         dry_run_output_folder.mkdir(exist_ok=True)
         for drive, descriptor in dry_run_delete_catalog.items():
             with open(dry_run_output_folder / f"{drive}.json", "w") as fp:

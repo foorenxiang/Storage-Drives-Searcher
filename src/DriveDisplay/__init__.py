@@ -5,7 +5,8 @@ from PIL import Image
 from pathlib import Path
 from from_root import from_root
 
-IMAGE_STORE = from_root(".") / "drive_images"
+APP_FOLDER = Path.home() / ".Storage Drive Searcher"
+IMAGE_STORE = APP_FOLDER / "drive_images"
 
 
 def display_drive_image(filepath, index=None):
