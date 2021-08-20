@@ -11,10 +11,10 @@ from src.utils.TimeExecution import time_exec
 from src.DriveDisplay import IMAGE_STORE, display_drive_image
 
 
-def take_cli_input():
-    cli_input = " ".join(sys.argv[1:])
-    if cli_input:
-        print("CLI inputs has been deprecated. Please enter search term here instead:")
+# def take_cli_input():
+#     cli_input = " ".join(sys.argv[1:])
+#     if cli_input:
+#         print("CLI inputs has been deprecated. Please enter search term here instead:")
 
 
 class FileSearcher(metaclass=SingletonMeta):
@@ -123,7 +123,7 @@ class FileSearcher(metaclass=SingletonMeta):
 
 @time_exec
 def run_search():
-    take_cli_input()
+    # take_cli_input()
     search_term = input("What would you like to search for?: ")
     FileSearcher().print_title(f"Searching for {search_term}\n")
     FileSearcher().count_paths()
