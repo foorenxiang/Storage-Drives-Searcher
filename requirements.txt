@@ -6,3 +6,4 @@ whatimage
 pyheif
 pillow
 pandas
+fastapi
